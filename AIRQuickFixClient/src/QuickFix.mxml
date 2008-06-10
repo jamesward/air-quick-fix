@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:WindowedApplication xmlns:mx="http://www.adobe.com/2006/mxml" width="700" height="400">
+  
+  <mx:Script>
+  <![CDATA[
+  private const imageFilter:FileFilter = new FileFilter("Images (jpg, gif, png)", "*.jpg;*.gif;*.png");
+  [Bindable] private var selectedFile:File;
+  [Bindable] private var endImageByteArray:ByteArray;
+  private var loader:Loader;
+  ]]>
+  </mx:Script>
+  
+  <mx:Style>
+    ViewStack {
+      backgroundColor: #ffffff;
+      borderStyle: solid;
+      borderColor: #444444;
+    }
+  </mx:Style>
+  
+  <mx:RemoteObject id="ro" destination="image" endpoint="http://airquickfix.appspot.com/image/">
+    <mx:result>
+    endImageByteArray = event.result as ByteArray;
+    loader.unload();
+    loader.loadBytes(endImageByteArray);
+    var sX:Number = (startImage.contentWidth / startImage.measuredWidth);
+    var sY:Number = (startImage.contentHeight / startImage.measuredHeight);
+    loader.scaleX = sX;
+    loader.scaleY = sY;
+    </mx:result>
+  </mx:RemoteObject>
+  
+  <mx:HBox width="100%" height="100%" verticalAlign="middle">
+    <mx:VBox width="50%" height="100%" horizontalAlign="center">
+      <mx:ViewStack id="startVS" width="100%" height="100%" selectedIndex="{(selectedFile == null) ? 0 : 1}" creationPolicy="all">
+        <mx:Canvas width="100%" height="100%">
+          <mx:Text verticalCenter="0" horizontalCenter="0">
+            <mx:htmlText><![CDATA[<font size="40"><b>Start Image</b></font>
+(Drag Image Here or click Select Image below)]]></mx:htmlText>
+          </mx:Text>
+        </mx:Canvas>
+        <mx:Canvas width="100%" height="100%">
+          <mx:Image id="startImage" width="100%" height="100%"/>
+        </mx:Canvas>
+      </mx:ViewStack>
+      <mx:Button label="Select Image">
+        <mx:click>
+        var f:File = File.desktopDirectory;
+        f.browseForOpen("Select file for QuickFix", [imageFilter]);
+        f.addEventListener(Event.SELECT, function (event:Event):void {
+          selectedFile = event.target as File;
+          var stream:FileStream = new FileStream();
+          stream.open(selectedFile, FileMode.READ);
+          var imageData:ByteArray = new ByteArray();
+          stream.readBytes(imageData);
+          //var s:String = imageData.toString();
+          ro.fiximage(imageData);
+          startImage.source = selectedFile.nativePath;
+        });
+        </mx:click>
+      </mx:Button>
+    </mx:VBox>
+    <mx:Canvas width="40">
+      <mx:Text>
+        <mx:text><![CDATA[--->]]></mx:text>
+      </mx:Text>
+    </mx:Canvas>
+    <mx:VBox width="50%" height="100%" horizontalAlign="center">
+      <mx:ViewStack id="endVS" width="100%" height="100%" creationPolicy="all" selectedIndex="{(endImageByteArray == null) ? 0 : 1}">
+        <mx:Canvas width="100%" height="100%">
+          <mx:Text verticalCenter="0" horizontalCenter="0">
+            <mx:htmlText><![CDATA[<font size="40"><b>End Image</b></font>
+(Drag image from here or click Save Image below)]]></mx:htmlText>
+          </mx:Text>
+        </mx:Canvas>
+        <mx:Canvas width="100%" height="100%">
+          <mx:UIComponent id="endImage" width="100%" height="100%">
+            <mx:initialize>
+            loader = new Loader();
+            endImage.addChild(loader);
+            </mx:initialize>
+            <mx:updateComplete>
+            var sX:Number = (startImage.contentWidth / startImage.measuredWidth);
+            var sY:Number = (startImage.contentHeight / startImage.measuredHeight);
+            loader.scaleX = sX;
+            loader.scaleY = sY;
+            //endImage.invalidateDisplayList();
+            </mx:updateComplete>
+          </mx:UIComponent>
+        </mx:Canvas>
+      </mx:ViewStack>
+      <mx:Button label="Save Image" enabled="{(endImageByteArray == null) ? false : true}">
+        <mx:click>
+        var f:File = File.desktopDirectory;
+        f.browseForSave("Save QuickFixed Image");
+        f.addEventListener(Event.SELECT, function (event:Event):void {
+          var stream:FileStream = new FileStream();
+          stream.open((event.target as File), FileMode.WRITE);
+          stream.writeBytes(endImageByteArray);
+          stream.close();
+        });
+        </mx:click>
+      </mx:Button>
+    </mx:VBox>
+  </mx:HBox>
+  
+</mx:WindowedApplication>

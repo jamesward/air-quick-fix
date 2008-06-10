@@ -1,0 +1,21 @@
+application: airquickfix
+version: 1
+runtime: python
+api_version: 1
+
+handlers:
+- url: /image/.*
+  script: main.py
+  
+- url: /
+  static_files: static/index.html
+  upload: static/
+
+- url: /index\.html
+  static_files: static/index.html
+  upload: static/
+
+- url: /static/QuickFix.air
+  mime_type: application/vnd.adobe.air-application-installer-package+zip
+  static_files: static/QuickFix.air
+  upload: static/
