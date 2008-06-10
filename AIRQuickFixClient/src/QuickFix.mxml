@@ -55,7 +55,7 @@
           stream.readBytes(imageData);
           //var s:String = imageData.toString();
           ro.fiximage(imageData);
-          startImage.source = selectedFile.nativePath;
+          startImage.source = selectedFile.url;
         });
         </mx:click>
       </mx:Button>
