@@ -2,16 +2,37 @@
 <mx:WindowedApplication xmlns:mx="http://www.adobe.com/2006/mxml" width="700" height="400">
   
   <mx:Script>
-  <![CDATA[
+  import mx.controls.Alert;
+  import mx.managers.DragManager;
+  
   private const imageFilter:FileFilter = new FileFilter("Images (jpg, gif, png)", "*.jpg;*.gif;*.png");
-  [Bindable] private var selectedFile:File;
-  [Bindable] private var endImageByteArray:ByteArray;
   private var loader:Loader;
-  ]]>
+  private var startFile:File;
+  private var tempFile:File;
+  private var loadingInProgress:Boolean = false;
+  private var loadingComplete:Boolean = true;
+  [Bindable] private var endImageByteArray:ByteArray;
+  
+  private function selectFile(file:File):void
+  {
+    loadingInProgress = true;
+    loadingComplete = false;
+    endVS.selectedIndex = 0;
+    startFile = file;
+    startImage.source = file.url;
+  }
+  
+  private function createFile(file:File):void
+  {
+    var stream:FileStream = new FileStream();
+    stream.open(file, FileMode.WRITE);
+    stream.writeBytes(endImageByteArray);
+    stream.close();
+  }
   </mx:Script>
   
   <mx:Style>
-    ViewStack {
+    .ImageHolder {
       backgroundColor: #ffffff;
       borderStyle: solid;
       borderColor: #444444;
@@ -20,42 +41,82 @@
   
   <mx:RemoteObject id="ro" destination="image" endpoint="http://airquickfix.appspot.com/image/">
     <mx:result>
+    status = "Image has been QuickFixed!";
+    setStyle("statusBarBackgroundColor", 0xc0c0c0);
     endImageByteArray = event.result as ByteArray;
     loader.unload();
     loader.loadBytes(endImageByteArray);
-    var sX:Number = (startImage.contentWidth / startImage.measuredWidth);
-    var sY:Number = (startImage.contentHeight / startImage.measuredHeight);
-    loader.scaleX = sX;
-    loader.scaleY = sY;
+    endVS.selectedIndex = 1;
+    endImage.invalidateDisplayList();
     </mx:result>
   </mx:RemoteObject>
   
   <mx:HBox width="100%" height="100%" verticalAlign="middle">
     <mx:VBox width="50%" height="100%" horizontalAlign="center">
-      <mx:ViewStack id="startVS" width="100%" height="100%" selectedIndex="{(selectedFile == null) ? 0 : 1}" creationPolicy="all">
-        <mx:Canvas width="100%" height="100%">
-          <mx:Text verticalCenter="0" horizontalCenter="0">
-            <mx:htmlText><![CDATA[<font size="40"><b>Start Image</b></font>
-(Drag Image Here or click Select Image below)]]></mx:htmlText>
-          </mx:Text>
-        </mx:Canvas>
-        <mx:Canvas width="100%" height="100%">
-          <mx:Image id="startImage" width="100%" height="100%"/>
-        </mx:Canvas>
-      </mx:ViewStack>
+      <mx:Canvas width="100%" height="100%" styleName="ImageHolder">
+        <mx:nativeDragEnter>
+        if (event.clipboard.hasFormat(ClipboardFormats.FILE_LIST_FORMAT))
+        {
+          var files:Array = event.clipboard.getData(ClipboardFormats.FILE_LIST_FORMAT) as Array;
+    
+      		if (files.length == 1)
+      		{
+      			DragManager.acceptDragDrop(event.currentTarget as Canvas);
+      		}
+        }
+        </mx:nativeDragEnter>
+        <mx:nativeDragDrop>
+        var arr:Array = event.clipboard.getData(ClipboardFormats.FILE_LIST_FORMAT) as Array;
+      	selectFile(arr[0] as File);
+        </mx:nativeDragDrop>
+        <mx:ViewStack id="startVS" width="100%" height="100%" creationPolicy="all">
+          <mx:Canvas width="100%" height="100%">
+            <mx:Text verticalCenter="0" horizontalCenter="0">
+              <mx:htmlText><![CDATA[<font size="40"><b>Start Image</b></font>
+  (Drag Image Here or click Select Image below)]]></mx:htmlText>
+            </mx:Text>
+          </mx:Canvas>
+          <mx:Canvas width="100%" height="100%">
+            <mx:Image id="startImage" width="100%" height="100%" horizontalAlign="center" verticalAlign="middle">
+              <mx:complete>
+              loadingComplete = true;
+              </mx:complete>
+              <mx:updateComplete>
+              <![CDATA[
+              if ((loadingInProgress) && (loadingComplete))
+              {
+                if ((startImage.measuredHeight * startImage.measuredWidth) > 1440000)
+                {
+                  Alert.show("Image is too large, try again.", "Error");
+                  startVS.selectedIndex = 0;
+                  status = "";
+                  setStyle("statusBarBackgroundColor", 0xc0c0c0);
+                }
+                else
+                {
+                  startVS.selectedIndex = 1;
+                  status = "QuickFixing Image: " + startFile.nativePath;
+                  setStyle("statusBarBackgroundColor", 0xff0000);
+                  var stream:FileStream = new FileStream();
+                  stream.open(startFile, FileMode.READ);
+                  var imageData:ByteArray = new ByteArray();
+                  stream.readBytes(imageData);
+                  ro.fiximage(imageData);
+                }
+                loadingInProgress = false;
+              }
+              ]]>
+              </mx:updateComplete>
+            </mx:Image>
+          </mx:Canvas>
+        </mx:ViewStack>
+      </mx:Canvas>
       <mx:Button label="Select Image">
         <mx:click>
         var f:File = File.desktopDirectory;
         f.browseForOpen("Select file for QuickFix", [imageFilter]);
         f.addEventListener(Event.SELECT, function (event:Event):void {
-          selectedFile = event.target as File;
-          var stream:FileStream = new FileStream();
-          stream.open(selectedFile, FileMode.READ);
-          var imageData:ByteArray = new ByteArray();
-          stream.readBytes(imageData);
-          //var s:String = imageData.toString();
-          ro.fiximage(imageData);
-          startImage.source = selectedFile.url;
+          selectFile(event.target as File);
         });
         </mx:click>
       </mx:Button>
@@ -66,7 +127,7 @@
       </mx:Text>
     </mx:Canvas>
     <mx:VBox width="50%" height="100%" horizontalAlign="center">
-      <mx:ViewStack id="endVS" width="100%" height="100%" creationPolicy="all" selectedIndex="{(endImageByteArray == null) ? 0 : 1}">
+      <mx:ViewStack id="endVS" width="100%" height="100%" creationPolicy="all" styleName="ImageHolder">
         <mx:Canvas width="100%" height="100%">
           <mx:Text verticalCenter="0" horizontalCenter="0">
             <mx:htmlText><![CDATA[<font size="40"><b>End Image</b></font>
@@ -80,24 +141,90 @@
             endImage.addChild(loader);
             </mx:initialize>
             <mx:updateComplete>
+            // scale the image
             var sX:Number = (startImage.contentWidth / startImage.measuredWidth);
             var sY:Number = (startImage.contentHeight / startImage.measuredHeight);
             loader.scaleX = sX;
             loader.scaleY = sY;
-            //endImage.invalidateDisplayList();
+            
+            // center the image
+            if (endImage.width > startImage.contentWidth)
+            {
+              loader.x = (endImage.width - startImage.contentWidth) / 2;
+            }
+            else
+            {
+              loader.x = 0;
+            }
+            
+            if (endImage.height > startImage.contentHeight)
+            {
+              loader.y = (endImage.height - startImage.contentHeight) / 2;
+            }
+            else
+            {
+              loader.y = 0;
+            }
             </mx:updateComplete>
+            <mx:mouseDown>
+            var thumbnailWidth:Number = 64;
+            var thumbnailHeight:Number = 64;
+            var tScaleX:Number = thumbnailWidth / startImage.measuredWidth;
+            var tScaleY:Number = thumbnailHeight / startImage.measuredHeight;
+            if (tScaleX > tScaleY)
+            {
+              tScaleX = tScaleY;
+              thumbnailWidth = startImage.measuredWidth * tScaleX;
+            }
+            else
+            {
+              tScaleY = tScaleX;
+              thumbnailHeight = startImage.measuredHeight * tScaleY;
+            }
+            var bd:BitmapData = new BitmapData(thumbnailWidth, thumbnailHeight);
+            var scaleMatrix:Matrix = new Matrix();
+            scaleMatrix.scale(tScaleX,tScaleY);
+            bd.draw(loader,scaleMatrix);
+            
+            // write temp file
+            
+            var imageName:String = startFile.name;
+            // todo: clean this up
+            imageName = imageName.replace(/\.jpg/, ".png");
+            imageName = imageName.replace(/\.gif/, ".png");
+            
+            var ttf:File = File.createTempFile();
+            tempFile = ttf.resolvePath("../" + imageName);
+            ttf.deleteFile();
+            createFile(tempFile);
+            
+            var transfer:Clipboard = new Clipboard();
+            transfer.setData(ClipboardFormats.BITMAP_FORMAT, bd);
+            transfer.setData(ClipboardFormats.FILE_LIST_FORMAT, new Array(tempFile), false);
+
+            var dragOptions:NativeDragOptions = new NativeDragOptions();
+            dragOptions.allowMove = true;
+            dragOptions.allowCopy = true;
+            dragOptions.allowLink = false;
+
+            NativeDragManager.doDrag(endImage, transfer, bd, null, dragOptions);
+            </mx:mouseDown>
+            <mx:nativeDragComplete>
+            if (tempFile.exists)
+            {
+              // todo: fix me
+              //tempFile.deleteFile();  // seems to cause problems
+            }
+            </mx:nativeDragComplete>
           </mx:UIComponent>
         </mx:Canvas>
       </mx:ViewStack>
       <mx:Button label="Save Image" enabled="{(endImageByteArray == null) ? false : true}">
         <mx:click>
         var f:File = File.desktopDirectory;
-        f.browseForSave("Save QuickFixed Image");
+        f.browseForSave("Save QuickFixed PNG Image");
         f.addEventListener(Event.SELECT, function (event:Event):void {
-          var stream:FileStream = new FileStream();
-          stream.open((event.target as File), FileMode.WRITE);
-          stream.writeBytes(endImageByteArray);
-          stream.close();
+          createFile(event.target as File);
         });
         </mx:click>
       </mx:Button>
