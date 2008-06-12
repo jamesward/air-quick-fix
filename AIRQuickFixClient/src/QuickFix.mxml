@@ -85,7 +85,7 @@
               <![CDATA[
               if ((loadingInProgress) && (loadingComplete))
               {
-                if ((startImage.measuredHeight * startImage.measuredWidth) > 1440000)
+                if ((startImage.measuredHeight * startImage.measuredWidth) > 1000000)
                 {
                   Alert.show("Image is too large, try again.", "Error");
                   startVS.selectedIndex = 0;
