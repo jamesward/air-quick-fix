@@ -1,0 +1,1 @@
+This is an example application that uses Adobe AIR with PyAMF and Google App Engine, showing how an AIR application can call web services through AMF to provide functionality for an AIR application. The demo uses the more advanced Flex Object Remoting API which is cleaner and higher level than netconnect.
